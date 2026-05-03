@@ -1,9 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-export default function Dashboard({ initialCameras, initialIncidents, initialStats, latestUrl }) {
-    const [cameras] = useState(initialCameras);
+export default function Dashboard({
+    initialCameras = [],
+    initialIncidents = [],
+    initialStats = {},
+    latestUrl
+}) {
+    // Sync incidents into local state so polling can update it
     const [incidents, setIncidents] = useState(initialIncidents);
-    const [stats] = useState(initialStats);
+
+    // Sync incidents state when initialIncidents prop updates
+    useEffect(() => {
+        setIncidents(initialIncidents);
+    }, [initialIncidents]);
+
+    // Use regular variables for cameras and stats if they don't change locally
+    const cameras = initialCameras;
+    const stats = initialStats;
+
     const [cameraState, setCameraState] = useState('Idle');
     const [cameraActive, setCameraActive] = useState(false);
     const [selectedService, setSelectedService] = useState('weapon');
@@ -11,8 +25,11 @@ export default function Dashboard({ initialCameras, initialIncidents, initialSta
     const [externalStreamUrl, setExternalStreamUrl] = useState('');
     const [aiState, setAiState] = useState('Paused');
     const [mode, setMode] = useState('idle');
+
     const videoRef = useRef(null);
     const mediaStream = useRef(null);
+
+    // Dynamic metrics calculation
     const liveStats = {
         critical: incidents.filter((incident) => incident.alert_level === 'critical').length || stats.critical || 0,
         high: incidents.filter((incident) => incident.alert_level === 'high').length || stats.high || 0,
@@ -20,58 +37,67 @@ export default function Dashboard({ initialCameras, initialIncidents, initialSta
         cameras: stats.cameras || cameras.length || 0,
     };
 
+    // Poll for the latest incidents
     useEffect(() => {
-        if (!latestUrl) return undefined;
+        if (!latestUrl) return;
 
         const interval = window.setInterval(async () => {
             try {
                 const response = await fetch(latestUrl, {
                     headers: { Accept: 'application/json' },
                 });
-                const data = await response.json();
-                setIncidents(data.incidents || []);
+                if (response.ok) {
+                    const data = await response.json();
+                    setIncidents(data.incidents || []);
+                }
             } catch (error) {
-                // Keep the current incident table if a transient poll fails.
+                // Keep current incidents if a transient poll fails
+                console.error('Polling error:', error);
             }
         }, 5000);
 
         return () => window.clearInterval(interval);
     }, [latestUrl]);
 
-    useEffect(() => () => stopWebcam(), []);
-
-    async function startWebcam() {
-        try {
-            stopWebcam();
-            setExternalStreamUrl('');
-
-            mediaStream.current = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: false,
-            });
-
-            if (videoRef.current) {
-                videoRef.current.srcObject = mediaStream.current;
-            }
-
-            setMode('webcam');
-            setCameraState('Webcam active');
-            setCameraActive(true);
-        } catch (error) {
-            setMode('idle');
-            setCameraState('Camera blocked');
-            setCameraActive(false);
-        }
-    }
+    // Clean up media tracks when the component unmounts
+    useEffect(() => {
+        return () => stopWebcam();
+    }, []);
 
     function stopWebcam() {
         if (mediaStream.current) {
             mediaStream.current.getTracks().forEach((track) => track.stop());
             mediaStream.current = null;
         }
-
         if (videoRef.current) {
             videoRef.current.srcObject = null;
+        }
+    }
+
+    async function startWebcam() {
+        try {
+            stopWebcam();
+            setExternalStreamUrl('');
+
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: false,
+            });
+
+            mediaStream.current = stream;
+
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+            }
+
+            setMode('webcam');
+            setCameraState('Webcam active');
+            setCameraActive(true);
+        } catch (error) {
+            console.error('Webcam access denied:', error);
+            setMode('idle');
+            setCameraState('Camera blocked');
+            setCameraActive(false);
         }
     }
 
@@ -106,8 +132,12 @@ export default function Dashboard({ initialCameras, initialIncidents, initialSta
                 method: 'POST',
                 headers: { Accept: 'application/json' },
             });
-            const data = await response.json();
-            setAiState(data.tracking ? 'Tracking' : 'Paused');
+            if (response.ok) {
+                const data = await response.json();
+                setAiState(data.tracking ? 'Tracking' : 'Paused');
+            } else {
+                setAiState('Service error');
+            }
         } catch (error) {
             setAiState('Service offline');
         }
@@ -132,6 +162,15 @@ export default function Dashboard({ initialCameras, initialIncidents, initialSta
                 <div className="header-actions">
                     <button className="secondary-button" type="button" onClick={startWebcam}>Start webcam</button>
                     <button className="ghost-button" type="button" onClick={stopCamera}>Stop</button>
+                    <button className="theme-icon-button" type="button" data-theme-toggle aria-label="Switch to dark mode">
+                        <svg className="theme-icon theme-icon-dark" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M21 14.5A8.5 8.5 0 0 1 9.5 3 7 7 0 1 0 21 14.5Z" />
+                        </svg>
+                        <svg className="theme-icon theme-icon-light" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-5.66 1.41-1.41M4.93 19.07l1.41-1.41m0-11.32L4.93 4.93m14.14 14.14-1.41-1.41" />
+                            <circle cx="12" cy="12" r="4" />
+                        </svg>
+                    </button>
                 </div>
             </header>
 
@@ -155,13 +194,29 @@ export default function Dashboard({ initialCameras, initialIncidents, initialSta
                     metric={`${incidents.length} recent`}
                     text="Review detections posted by the AI service, including alert level, confidence, snapshots, and saved clips."
                     tone="incident"
-                    action={<button className="ghost-button" type="button" onClick={() => document.getElementById('incidents')?.scrollIntoView({ behavior: 'smooth' })}>View incidents</button>}
+                    action={
+                        <button
+                            className="ghost-button"
+                            type="button"
+                            onClick={() => document.getElementById('incidents')?.scrollIntoView({ behavior: 'smooth' })}
+                        >
+                            View incidents
+                        </button>
+                    }
                 />
                 <ActionCard
                     title="Camera Registry"
                     metric={`${cameras.length} cameras`}
                     text="Cameras are registered automatically the first time your Python service sends a detection event."
-                    action={<button className="ghost-button" type="button" onClick={() => document.getElementById('cameras')?.scrollIntoView({ behavior: 'smooth' })}>View cameras</button>}
+                    action={
+                        <button
+                            className="ghost-button"
+                            type="button"
+                            onClick={() => document.getElementById('cameras')?.scrollIntoView({ behavior: 'smooth' })}
+                        >
+                            View cameras
+                        </button>
+                    }
                 />
                 <ActionCard
                     title="System Health"
@@ -227,12 +282,12 @@ export default function Dashboard({ initialCameras, initialIncidents, initialSta
 
                     <div className="camera-list">
                         {cameras.length ? cameras.map((camera) => (
-                            <div className="camera-row" key={camera.id}>
+                            <div className="camera-row" key={camera.id || camera.camera_id}>
                                 <div>
-                                    <strong>{camera.name}</strong>
+                                    <strong>{camera.name || camera.camera_id}</strong>
                                     <small>{camera.district || 'No district'}</small>
                                 </div>
-                                <span className="status-pill">{camera.status}</span>
+                                <span className="status-pill">{camera.status || 'Active'}</span>
                             </div>
                         )) : <p className="empty-state">No cameras registered yet.</p>}
                     </div>

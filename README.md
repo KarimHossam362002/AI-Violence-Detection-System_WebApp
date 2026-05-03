@@ -1,168 +1,92 @@
-# AI Violence Detection System - Web Dashboard
+# AI Violence Detection System
 
-Laravel + React dashboard for monitoring live camera streams, receiving AI detection events, storing incident metadata, and giving operators a simple interface for reviewing alerts and evidence.
+Laravel + React web dashboard for monitoring local AI camera streams, receiving detection incidents, storing evidence, and reviewing alerts from one operator console.
 
-The AI models are not executed inside Laravel. The recommended setup is to keep the Python inference code as a separate service that reads the camera, runs the violence/weapon models, saves clips locally, and sends incident events to this Laravel backend.
+The web app and the AI models are separate services:
 
-## Project Overview
+- Laravel handles auth, dashboard pages, database records, users, cameras, and the incident API.
+- React/Vite powers the dashboard UI.
+- Python/OpenCV services run the weapon and violence models, expose MJPEG streams, save snapshots/clips, and post incident records back to Laravel.
 
-This web app provides:
+## Services
 
-- Login and registration.
-- Admin/user privileges.
-- Default seeded admin account.
-- React dashboard cards for webcam access, incident archive, camera registry, and system health.
-- Browser webcam preview for local testing.
-- Python MJPEG stream preview, for example `http://127.0.0.1:5000/stream`.
-- API endpoint for Python inference events.
-- Database tables for users, cameras, and incidents.
-- Local storage paths for snapshots, clips, and model files.
+| Service | Local URL | Container name | Purpose |
+| --- | --- | --- | --- |
+| Laravel backend | `http://127.0.0.1:8000` | `violence-backend` | Web dashboard and API |
+| Vite frontend | `http://127.0.0.1:5173` | `violence-frontend` | Dev asset server |
+| MySQL | `127.0.0.1:3306` | `violence-mysql` | App database |
+| Weapon AI | `http://127.0.0.1:5000` | `violence-weapon-service` | YOLO weapon stream and detection |
+| Violence AI | `http://127.0.0.1:5001` | `violence-violence-service` | Keras violence stream and detection |
+| phpMyAdmin | `http://127.0.0.1:8080` | `violence-phpmyadmin` | Optional database UI |
 
-## Architecture
-
-```text
-Laptop Camera / CCTV Stream
-        |
-        v
-Python Inference Service
-OpenCV + Violence Model + Weapon Model
-        |
-        | saves clips / snapshots locally
-        | sends HTTP POST incident payload
-        v
-Laravel API
-stores cameras + incidents in MySQL
-        |
-        v
-React Dashboard
-operator views alerts, evidence, stream, users
-```
-
-### Why Python is separate
-
-Laravel should handle the web application layer: authentication, database records, API routes, dashboard views, and user permissions.
-
-Python should handle the AI layer: camera capture, frame processing, model inference, clip generation, and event posting.
-
-This separation keeps the dashboard responsive and prevents long-running model inference from blocking normal web requests.
-
-## Tech Stack
-
-- Backend: Laravel 12
-- Frontend: React + Vite
-- Database: MySQL
-- Auth: Laravel session authentication
-- AI integration: Python service via REST API
-- Camera preview: browser webcam or Python MJPEG stream
-
-## Important Local URLs
-
-| Service | URL | Purpose |
-| --- | --- | --- |
-| Laravel app | `http://127.0.0.1:8000` | Web dashboard |
-| Login page | `http://127.0.0.1:8000/login` | Operator/admin login |
-| Dashboard | `http://127.0.0.1:8000/dashboard` | Main monitoring UI |
-| Laravel health check | `http://127.0.0.1:8000/up` | Quick app status |
-| Python stream example | `http://127.0.0.1:5000/stream` | MJPEG camera stream |
-| Weapon AI stream | `http://127.0.0.1:5000/stream` | YOLO weapon detection service |
-| Violence AI stream | `http://127.0.0.1:5001/stream` | Keras violence detection service |
-| Jupyter Lab example | `http://localhost:8888/lab/workspaces/auto-F` | Notebook environment only |
-
-Jupyter is where you run/edit Python code. The dashboard does not load the Jupyter URL. The dashboard loads the stream URL exposed by your Python code, usually something like `http://127.0.0.1:5000/stream`.
-
-## Default Admin Account
-
-After running the database seeder:
+Default admin after seeding:
 
 ```text
 Email: admin@example.com
 Password: admin
-Role: admin
 ```
 
-The admin can access the user management screen and change user roles.
+## Architecture
 
-## Local Setup
+```text
+Camera / CCTV source
+        |
+        v
+Python AI services
+OpenCV + YOLO weapon model / Keras violence model
+        |
+        | MJPEG stream on ports 5000 and 5001
+        | saves snapshots and clips
+        | POST /api/incidents
+        v
+Laravel backend + MySQL
+        |
+        v
+React dashboard
+```
 
-### 1. Install PHP dependencies
+## Local Setup Without Docker
+
+Install PHP and Node dependencies:
 
 ```bash
 composer install
-```
-
-### 2. Install frontend dependencies
-
-```bash
 npm install
 ```
 
-### 3. Configure environment
-
-Copy the example environment file if `.env` does not exist:
+Create `.env` and configure MySQL:
 
 ```bash
 cp .env.example .env
-```
-
-Generate the Laravel app key:
-
-```bash
 php artisan key:generate
 ```
 
-Set the database values in `.env`:
+Recommended `.env` values:
 
 ```env
+APP_URL=http://127.0.0.1:8000
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=violence
 DB_USERNAME=root
 DB_PASSWORD=
+FILESYSTEM_DISK=public
+INFERENCE_API_TOKEN=
 ```
 
-Optional API token for Python-to-Laravel incident posting:
-
-```env
-INFERENCE_API_TOKEN=your-local-token
-```
-
-If `INFERENCE_API_TOKEN` is empty, the incident API accepts local posts without that header. If it is set, Python must send it as `X-Inference-Token`.
-
-### 4. Create the MySQL database
-
-Create a database named:
-
-```text
-violence
-```
-
-With Laragon/MySQL, this can be done from a database GUI or the MySQL CLI.
-
-### 5. Run migrations
+Create the database, then run:
 
 ```bash
-php artisan migrate
+php artisan migrate --seed
+php artisan storage:link
 ```
 
-### 6. Seed the default admin
+Start the web app:
 
 ```bash
-php artisan db:seed
-```
-
-### 7. Build frontend assets
-
-```bash
-npm run build
-```
-
-If `public/hot` exists but Vite is not running, Laravel may try to load assets from `http://[::1]:5173` and the page can look blank. Delete `public/hot` or run Vite with `npm run dev`.
-
-### 8. Start Laravel
-
-```bash
-php artisan serve --host=127.0.0.1 --port=8000
+php artisan serve --host=127.0.0.1 --port=8000 --no-reload
+npm run dev
 ```
 
 Open:
@@ -171,117 +95,99 @@ Open:
 http://127.0.0.1:8000/login
 ```
 
-## Running The Python Stream
+## Running The AI Services
 
-This repository includes separate Python services for each model.
-
-### Weapon Detection Service
-
-```text
-ai_service/weapon_detection_service.py
-```
-
-It exposes:
-
-| Endpoint | Method | Purpose |
-| --- | --- | --- |
-| `/stream` | GET | MJPEG stream for the dashboard |
-| `/start` | POST | Start YOLO weapon tracking |
-| `/stop` | POST | Stop YOLO weapon tracking |
-| `/status` | GET | Current service state |
-
-Install Python dependencies:
+Install Python requirements in your virtual environment:
 
 ```bash
 pip install -r ai_service/requirements.txt
 ```
 
-Place the weapon model here:
+Place models here:
 
 ```text
 storage/app/models/weapon/weapon_detection_yolov11m.pt
+storage/app/models/violence/cctvmodel_advanced.keras
 ```
 
-Or use a custom path:
-
-```bash
-set WEAPON_MODEL_PATH=D:\path\to\weapon_detection_yolov11m.pt
-```
-
-Run the service:
+Run weapon detection:
 
 ```bash
 python ai_service/weapon_detection_service.py
 ```
 
-It uses:
+Weapon endpoints:
 
 ```text
-storage/app/models/weapon/weapon_detection_yolov11m.pt
+GET  http://127.0.0.1:5000/status
+GET  http://127.0.0.1:5000/stream
+POST http://127.0.0.1:5000/start
+POST http://127.0.0.1:5000/stop
 ```
 
-and runs at:
-
-```text
-http://127.0.0.1:5000/stream
-```
-
-### Violence Detection Service
-
-```text
-ai_service/violence_detection_service.py
-```
-
-It uses your MobileNetV2 feature extractor and Keras sequence model:
-
-```text
-storage/app/models/violence/cctvmodel_advanced.keras
-```
-
-Run it separately:
+Run violence detection:
 
 ```bash
 python ai_service/violence_detection_service.py
 ```
 
-It runs at:
+Violence endpoints:
 
 ```text
-http://127.0.0.1:5001/stream
+GET  http://127.0.0.1:5001/status
+GET  http://127.0.0.1:5001/stream
+POST http://127.0.0.1:5001/start
+POST http://127.0.0.1:5001/stop
 ```
 
-Then in the dashboard:
+### Camera Source Note
 
-1. Go to `http://127.0.0.1:8000/dashboard`.
-2. Select `Weapon detection` or `Violence detection`.
-3. Click `Load stream`.
-4. Click `Start AI`.
+Both AI services default to camera source `0`. On Windows, one physical webcam usually cannot be opened by two OpenCV processes at the same time. Run one model service at a time, or use separate camera sources.
 
-The Python service saves clips and snapshots under:
-
-```text
-storage/app/public/incidents/videos/
-storage/app/public/incidents/snapshots/
-```
-
-The browser URLs saved in the incident record look like:
-
-```text
-/storage/incidents/videos/weapon_YYYYMMDD_HHMMSS.mp4
-/storage/incidents/snapshots/weapon_YYYYMMDD_HHMMSS.jpg
-```
-
-Make sure Laravel's public storage link exists:
+Environment overrides:
 
 ```bash
-php artisan storage:link
+set CAMERA_SOURCE=0
+set VIOLENCE_CAMERA_SOURCE=1
 ```
 
-When a recording finishes, Python POSTs the saved `clip_path` and `snapshot_url` to Laravel so the incidents table can open the evidence files.
+If you need both models on the same camera at the same time, the best design is a combined Python service that opens the camera once and sends the same frames through both models.
+
+## Docker Setup
+
+The project includes:
+
+```text
+docker-compose.yml
+docker/backend/Dockerfile
+docker/frontend/Dockerfile
+docker/ai/Dockerfile
+.env.docker.example
+```
+
+Start the web stack:
+
+```bash
+docker compose up --build
+```
+
+This starts Laravel, Vite, and MySQL.
+
+Start with phpMyAdmin:
+
+```bash
+docker compose --profile tools up --build
+```
+
+Start the AI services too:
+
+```bash
+docker compose --profile ai up --build
+```
+
+Important camera caveat: Docker camera access is easiest on Linux with `/dev/video0`. Docker Desktop on Windows does not reliably pass a laptop webcam into Linux containers. For Windows development, run the Laravel/MySQL/frontend services in Docker and run the Python AI service directly on Windows when you need webcam access.
 
 ## Incident API
-
-Python should send a POST request when violence or weapon detection happens.
 
 Endpoint:
 
@@ -289,227 +195,194 @@ Endpoint:
 POST http://127.0.0.1:8000/api/incidents
 ```
 
-Example payload:
+Payload:
 
 ```json
 {
-  "camera_id": "CAM_042",
-  "district": "Downtown",
+  "camera_id": "LAPTOP_CAM",
+  "district": "Local Test",
   "event_type": "Weapon Detected",
   "confidence": 0.94,
   "violence_score": 0.87,
   "weapon_detected": true,
   "alert_level": "critical",
-  "timestamp": "2026-05-02T14:32:10",
-  "snapshot_url": "/storage/incidents/snapshots/042.jpg",
-  "clip_path": "/storage/incidents/videos/incident_042.mp4"
+  "timestamp": "2026-05-04T00:20:00",
+  "snapshot_url": "/storage/incidents/snapshots/example.jpg",
+  "clip_path": "/storage/incidents/videos/example.mp4"
 }
 ```
 
-If `INFERENCE_API_TOKEN` is set in `.env`, include:
+If `INFERENCE_API_TOKEN` is set, include:
 
 ```http
-X-Inference-Token: your-local-token
+X-Inference-Token: your-token
 ```
 
-Python example:
+List incidents:
 
-```python
-import requests
-
-payload = {
-    "camera_id": "CAM_042",
-    "district": "Downtown",
-    "event_type": "Violence Detected",
-    "confidence": 0.91,
-    "violence_score": 0.91,
-    "weapon_detected": False,
-    "alert_level": "high",
-    "clip_path": "/storage/incidents/videos/incident_042.mp4",
-}
-
-requests.post(
-    "http://127.0.0.1:8000/api/incidents",
-    json=payload,
-    headers={
-        "Accept": "application/json",
-        "X-Inference-Token": "your-local-token",
-    },
-    timeout=5,
-)
+```http
+GET http://127.0.0.1:8000/api/incidents
 ```
 
-## Model File Locations
+## Postman
 
-Place model files here:
+Import this collection directly into Postman:
 
 ```text
-storage/app/models/violence/
-storage/app/models/weapon/
+postman/AI-Violence-Detection-System.postman_collection.json
 ```
 
-Recommended naming:
+To regenerate it:
+
+```bash
+node postman/generate-postman-collection.js
+```
+
+Collection variables:
 
 ```text
-storage/app/models/violence/violence_model.pt
-storage/app/models/weapon/weapon_model.pt
+laravel_url=http://127.0.0.1:8000
+weapon_service_url=http://127.0.0.1:5000
+violence_service_url=http://127.0.0.1:5001
+inference_token=
 ```
 
-The Laravel app does not load these files directly yet. They are reserved for local organization and future service integration.
+## Evidence Clips And Snapshots
 
-## Evidence Storage
-
-Recommended local evidence paths:
+The Python services save evidence under:
 
 ```text
 storage/app/public/incidents/videos/
 storage/app/public/incidents/snapshots/
 ```
 
-Public URLs should look like:
+Laravel serves them through:
 
 ```text
-/storage/incidents/videos/incident_001.mp4
-/storage/incidents/snapshots/incident_001.jpg
+public/storage -> storage/app/public
 ```
 
-If public storage links are not working, run:
+Create that link with:
 
 ```bash
 php artisan storage:link
 ```
 
-## Dashboard Cards
-
-The React dashboard contains:
-
-- Live Webcam: starts the browser webcam or loads a Python stream URL.
-- Incident Archive: jumps to the incidents table.
-- Camera Registry: shows cameras discovered from incoming incidents.
-- System Health: links to Laravel `/up`.
-
-The incidents table refreshes every five seconds using:
+Saved incident URLs look like:
 
 ```text
-/dashboard/incidents/latest
+/storage/incidents/videos/weapon_YYYYMMDD_HHMMSS.mp4
+/storage/incidents/snapshots/weapon_YYYYMMDD_HHMMSS.jpg
 ```
 
-## Roles And Privileges
+### Clip Does Not Play In Edge/Chrome
 
-| Role | Permissions |
-| --- | --- |
-| admin | Access dashboard, manage users, change roles |
-| user | Access dashboard and view incidents |
+If the file exists locally but the browser does not play it, the usual cause is codec compatibility. OpenCV often writes `.mp4` files with the `mp4v` codec, while Edge/Chrome prefer H.264 video with `yuv420p` pixels.
 
-The first manually registered user is also created as admin, but the recommended local account is the seeded admin.
+The Python services now try to transcode finished clips with `ffmpeg`:
+
+```text
+H.264 + yuv420p + faststart
+```
+
+Install `ffmpeg` locally and make sure it is available in `PATH`, or use the Docker AI image, which includes `ffmpeg`.
+
+Quick checks:
+
+```bash
+ffmpeg -version
+php artisan storage:link
+```
+
+Then record a new incident. Existing old clips may still be encoded as `mp4v`; re-record or transcode them manually with:
+
+```bash
+ffmpeg -i old.mp4 -vcodec libx264 -pix_fmt yuv420p -movflags +faststart -an fixed.mp4
+```
 
 ## Common Issues
 
-### Dashboard looks blank
+### Dashboard Is Blank
 
-Check whether `public/hot` exists.
-
-If Vite is not running:
-
-```bash
-del public\hot
-npm run build
-```
-
-Or start Vite:
+Make sure Vite is running:
 
 ```bash
 npm run dev
 ```
 
-### Unknown database `violence`
-
-Create the MySQL database first, then run:
+Or build assets and remove stale hot reload state:
 
 ```bash
-php artisan migrate
+npm run build
+del public\hot
 ```
 
-### Login fails after fresh setup
+The Blade layout includes `@viteReactRefresh`, which is required for React Fast Refresh in Laravel.
 
-Run:
+### Stream Does Not Load
 
-```bash
-php artisan db:seed
-```
-
-Then use:
+Check the service status:
 
 ```text
-admin@example.com / admin
+http://127.0.0.1:5000/status
+http://127.0.0.1:5001/status
 ```
 
-### Stream does not load
+If `camera_opened` is false on the violence service, stop other camera apps or the weapon service, then restart violence detection.
 
-Make sure your Python service is running at the stream URL, for example:
+### TensorFlow Startup Logs
 
-```text
-http://127.0.0.1:5000/stream
+Messages about oneDNN, CPU instructions, or no native Windows GPU support are normal TensorFlow startup logs. They are not fatal unless the process exits or `/status` is unreachable.
+
+### MySQL Connection Fails In Docker
+
+Inside Docker, use:
+
+```env
+DB_HOST=mysql
+DB_USERNAME=violence
+DB_PASSWORD=violence
 ```
 
-Do not paste the Jupyter Lab URL into the dashboard stream box.
+From your host machine, use:
 
-## Suggested Development Flow
+```env
+DB_HOST=127.0.0.1
+```
 
-1. Start MySQL/Laragon.
-2. Start Laravel on port `8000`.
-3. Start Python/Jupyter.
-4. Run the Python stream server on port `5000`.
-5. Open the Laravel dashboard.
-6. Paste the Python stream URL into the dashboard.
-7. Let Python POST incidents to `/api/incidents`.
-8. Review alerts and clips in the dashboard.
-
-## Project Structure Notes
+## Project Structure
 
 ```text
 app/
   Http/Controllers/
-    Auth/              # Login and registration
-    Admin/             # User role management
-    Api/               # Python incident ingestion API
+    Admin/
+    Api/
+    Auth/
   Models/
-    Camera.php
-    Incident.php
-    User.php
 
-database/
-  factories/
-    UserFactory.php
-  migrations/
-  seeders/
-    DatabaseSeeder.php
+ai_service/
+  weapon_detection_service.py
+  violence_detection_service.py
+  requirements.txt
+
+docker/
+  ai/
+  backend/
+  frontend/
+
+postman/
+  generate-postman-collection.js
+  AI-Violence-Detection-System.postman_collection.json
 
 resources/
-  js/
-    components/
-      Dashboard.jsx    # React dashboard UI
+  js/components/Dashboard.jsx
   views/
-    auth/
-    admin/
-    dashboard/
 
 routes/
-  web.php              # Auth, dashboard, admin pages
-  api.php              # Incident API
+  api.php
+  web.php
 
-storage/
-  app/models/          # Local AI model drop-zone
-  app/public/incidents # Suggested evidence storage
+storage/app/
+  models/
+  public/incidents/
 ```
-
-## Current Status
-
-This project currently supports the full local demo loop:
-
-```text
-Python camera stream -> Laravel dashboard preview
-Python detection event -> Laravel API -> MySQL incident record -> React incident table
-```
-
-Next improvements can include WebSocket alerts, clip upload endpoints, camera management screens, and separate pages for incident details.

@@ -1,0 +1,13 @@
+.git
+.idea
+.venv
+node_modules
+vendor
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+ai_service/__pycache__
+ai_service/*.log
+ai_service/.python-tmp
+public/hot

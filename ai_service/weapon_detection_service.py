@@ -1,4 +1,6 @@
 import os
+import shutil
+import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
@@ -126,6 +128,38 @@ def public_url_for(path: Path) -> str:
     return f"/storage/{relative}"
 
 
+def make_browser_playable_clip(path: Path) -> Path:
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg or not path.exists():
+        if not ffmpeg:
+            print("ffmpeg was not found; clip was saved with OpenCV's default mp4v codec.", flush=True)
+        return path
+
+    converted_path = path.with_name(f"{path.stem}_h264{path.suffix}")
+    command = [
+        ffmpeg,
+        "-y",
+        "-i",
+        str(path),
+        "-vcodec",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        "-an",
+        str(converted_path),
+    ]
+
+    try:
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        converted_path.replace(path)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f"Could not convert clip to browser-compatible H.264: {exc}", flush=True)
+
+    return path
+
+
 def build_incident_name() -> str:
     return datetime.now().strftime("weapon_%Y%m%d_%H%M%S")
 
@@ -166,6 +200,7 @@ def stop_recording_and_report() -> None:
 
     clip_path = recording["clip_path"]
     snapshot_path = recording["snapshot_path"]
+    clip_path = make_browser_playable_clip(clip_path)
 
     payload = {
         "camera_id": CAMERA_ID,
