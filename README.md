@@ -64,6 +64,8 @@ This separation keeps the dashboard responsive and prevents long-running model i
 | Dashboard | `http://127.0.0.1:8000/dashboard` | Main monitoring UI |
 | Laravel health check | `http://127.0.0.1:8000/up` | Quick app status |
 | Python stream example | `http://127.0.0.1:5000/stream` | MJPEG camera stream |
+| Weapon AI stream | `http://127.0.0.1:5000/stream` | YOLO weapon detection service |
+| Violence AI stream | `http://127.0.0.1:5001/stream` | Keras violence detection service |
 | Jupyter Lab example | `http://localhost:8888/lab/workspaces/auto-F` | Notebook environment only |
 
 Jupyter is where you run/edit Python code. The dashboard does not load the Jupyter URL. The dashboard loads the stream URL exposed by your Python code, usually something like `http://127.0.0.1:5000/stream`.
@@ -171,47 +173,111 @@ http://127.0.0.1:8000/login
 
 ## Running The Python Stream
 
-Your Python model code should expose a stream endpoint. A simple Flask MJPEG stream looks like this:
+This repository includes separate Python services for each model.
 
-```python
-from flask import Flask, Response
-import cv2
+### Weapon Detection Service
 
-app = Flask(__name__)
-camera = cv2.VideoCapture(0)
+```text
+ai_service/weapon_detection_service.py
+```
 
-def generate_frames():
-    while True:
-        success, frame = camera.read()
+It exposes:
 
-        if not success:
-            break
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/stream` | GET | MJPEG stream for the dashboard |
+| `/start` | POST | Start YOLO weapon tracking |
+| `/stop` | POST | Stop YOLO weapon tracking |
+| `/status` | GET | Current service state |
 
-        ok, buffer = cv2.imencode(".jpg", frame)
+Install Python dependencies:
 
-        if not ok:
-            continue
+```bash
+pip install -r ai_service/requirements.txt
+```
 
-        yield (
-            b"--frame\r\n"
-            b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n"
-        )
+Place the weapon model here:
 
-@app.route("/stream")
-def stream():
-    return Response(
-        generate_frames(),
-        mimetype="multipart/x-mixed-replace; boundary=frame",
-    )
+```text
+storage/app/models/weapon/weapon_detection_yolov11m.pt
+```
 
-app.run(host="127.0.0.1", port=5000)
+Or use a custom path:
+
+```bash
+set WEAPON_MODEL_PATH=D:\path\to\weapon_detection_yolov11m.pt
+```
+
+Run the service:
+
+```bash
+python ai_service/weapon_detection_service.py
+```
+
+It uses:
+
+```text
+storage/app/models/weapon/weapon_detection_yolov11m.pt
+```
+
+and runs at:
+
+```text
+http://127.0.0.1:5000/stream
+```
+
+### Violence Detection Service
+
+```text
+ai_service/violence_detection_service.py
+```
+
+It uses your MobileNetV2 feature extractor and Keras sequence model:
+
+```text
+storage/app/models/violence/cctvmodel_advanced.keras
+```
+
+Run it separately:
+
+```bash
+python ai_service/violence_detection_service.py
+```
+
+It runs at:
+
+```text
+http://127.0.0.1:5001/stream
 ```
 
 Then in the dashboard:
 
 1. Go to `http://127.0.0.1:8000/dashboard`.
-2. Paste `http://127.0.0.1:5000/stream`.
+2. Select `Weapon detection` or `Violence detection`.
 3. Click `Load stream`.
+4. Click `Start AI`.
+
+The Python service saves clips and snapshots under:
+
+```text
+storage/app/public/incidents/videos/
+storage/app/public/incidents/snapshots/
+```
+
+The browser URLs saved in the incident record look like:
+
+```text
+/storage/incidents/videos/weapon_YYYYMMDD_HHMMSS.mp4
+/storage/incidents/snapshots/weapon_YYYYMMDD_HHMMSS.jpg
+```
+
+Make sure Laravel's public storage link exists:
+
+```bash
+php artisan storage:link
+```
+
+When a recording finishes, Python POSTs the saved `clip_path` and `snapshot_url` to Laravel so the incidents table can open the evidence files.
 
 ## Incident API
 

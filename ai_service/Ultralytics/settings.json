@@ -1,0 +1,21 @@
+{
+  "settings_version": "0.0.6",
+  "datasets_dir": "D:\\FCIS-2024\\FCIS-4th-Year\\GP\\AI-Violence-Detection-System\\backend\\datasets",
+  "weights_dir": "D:\\FCIS-2024\\FCIS-4th-Year\\GP\\AI-Violence-Detection-System\\backend\\violence\\weights",
+  "runs_dir": "D:\\FCIS-2024\\FCIS-4th-Year\\GP\\AI-Violence-Detection-System\\backend\\violence\\runs",
+  "uuid": "adf63eb3f8a567a66d28eeb8a6cc2e24a5b462cca9af312179d1fa6746e6a55c",
+  "sync": true,
+  "api_key": "",
+  "openai_api_key": "",
+  "clearml": true,
+  "comet": true,
+  "dvc": true,
+  "hub": true,
+  "mlflow": true,
+  "neptune": true,
+  "raytune": true,
+  "tensorboard": false,
+  "wandb": false,
+  "vscode_msg": true,
+  "openvino_msg": true
+}

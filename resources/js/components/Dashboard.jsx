@@ -6,8 +6,10 @@ export default function Dashboard({ initialCameras, initialIncidents, initialSta
     const [stats] = useState(initialStats);
     const [cameraState, setCameraState] = useState('Idle');
     const [cameraActive, setCameraActive] = useState(false);
-    const [streamUrl, setStreamUrl] = useState('');
+    const [selectedService, setSelectedService] = useState('weapon');
+    const [streamUrl, setStreamUrl] = useState(serviceStreamUrl('weapon'));
     const [externalStreamUrl, setExternalStreamUrl] = useState('');
+    const [aiState, setAiState] = useState('Paused');
     const [mode, setMode] = useState('idle');
     const videoRef = useRef(null);
     const mediaStream = useRef(null);
@@ -91,6 +93,35 @@ export default function Dashboard({ initialCameras, initialIncidents, initialSta
         setCameraActive(true);
     }
 
+    async function toggleAiTracking(shouldStart) {
+        const endpoint = pythonServiceEndpoint(shouldStart ? 'start' : 'stop');
+
+        if (!endpoint) {
+            setAiState('Missing stream URL');
+            return;
+        }
+
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { Accept: 'application/json' },
+            });
+            const data = await response.json();
+            setAiState(data.tracking ? 'Tracking' : 'Paused');
+        } catch (error) {
+            setAiState('Service offline');
+        }
+    }
+
+    function pythonServiceEndpoint(path) {
+        try {
+            const url = new URL(streamUrl);
+            return `${url.origin}/${path}`;
+        } catch (error) {
+            return '';
+        }
+    }
+
     return (
         <>
             <header className="page-header">
@@ -114,8 +145,8 @@ export default function Dashboard({ initialCameras, initialIncidents, initialSta
             <section className="action-card-grid">
                 <ActionCard
                     title="Live Webcam"
-                    metric={cameraState}
-                    text="Open the laptop camera for local testing, or switch to the Python model stream when inference is running."
+                    metric={`${serviceLabel(selectedService)} / ${aiState}`}
+                    text="Pick weapon or violence detection, load the stream, then start analysis from the dashboard."
                     tone={cameraActive ? 'active' : ''}
                     action={<button className="secondary-button" type="button" onClick={startWebcam}>Start webcam</button>}
                 />
@@ -146,7 +177,7 @@ export default function Dashboard({ initialCameras, initialIncidents, initialSta
                     <div className="panel-header">
                         <div>
                             <h2>Camera Access</h2>
-                            <p>Use the laptop webcam now, or paste your Python MJPEG stream URL when ready.</p>
+                            <p>Use browser webcam preview, or load one of the Python AI streams.</p>
                         </div>
                         <span className={`status-pill ${cameraActive ? 'online' : ''}`}>{cameraState}</span>
                     </div>
@@ -158,6 +189,22 @@ export default function Dashboard({ initialCameras, initialIncidents, initialSta
                     </div>
 
                     <div className="stream-controls">
+                        <select
+                            value={selectedService}
+                            onChange={(event) => {
+                                const service = event.target.value;
+                                setSelectedService(service);
+                                setStreamUrl(serviceStreamUrl(service));
+                                setExternalStreamUrl('');
+                                setMode('idle');
+                                setCameraState('Idle');
+                                setCameraActive(false);
+                                setAiState('Paused');
+                            }}
+                        >
+                            <option value="weapon">Weapon detection</option>
+                            <option value="violence">Violence detection</option>
+                        </select>
                         <input
                             type="url"
                             value={streamUrl}
@@ -165,6 +212,8 @@ export default function Dashboard({ initialCameras, initialIncidents, initialSta
                             placeholder="http://127.0.0.1:5000/stream"
                         />
                         <button className="secondary-button" type="button" onClick={loadPythonStream}>Load stream</button>
+                        <button className="primary-button" type="button" onClick={() => toggleAiTracking(true)}>Start AI</button>
+                        <button className="ghost-button" type="button" onClick={() => toggleAiTracking(false)}>Stop AI</button>
                     </div>
                 </div>
 
@@ -224,6 +273,16 @@ export default function Dashboard({ initialCameras, initialIncidents, initialSta
             </section>
         </>
     );
+}
+
+function serviceStreamUrl(service) {
+    return service === 'violence'
+        ? 'http://127.0.0.1:5001/stream'
+        : 'http://127.0.0.1:5000/stream';
+}
+
+function serviceLabel(service) {
+    return service === 'violence' ? 'Violence AI' : 'Weapon AI';
 }
 
 function ActionCard({ title, metric, text, action, tone = '' }) {
