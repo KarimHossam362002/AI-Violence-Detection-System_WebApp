@@ -22,6 +22,11 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/stream', [DashboardController::class, 'stream'])->name('stream');
+    Route::get('/incidents', [DashboardController::class, 'incidents'])->name('incidents.index');
+    Route::get('/incidents/{incident}', [DashboardController::class, 'showIncident'])->name('incidents.show');
+    Route::get('/cameras', [DashboardController::class, 'cameras'])->name('cameras.index');
+    Route::get('/evidence', [DashboardController::class, 'evidence'])->name('evidence.index');
     Route::get('/dashboard/incidents/latest', [DashboardController::class, 'latestIncidents'])->name('dashboard.incidents.latest');
 
     Route::get('/admin/users', [UserController::class, 'index'])->name('admin.users.index');

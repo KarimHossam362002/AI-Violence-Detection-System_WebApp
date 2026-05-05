@@ -37,8 +37,10 @@ DISTRICT = os.getenv("CAMERA_DISTRICT", "Local Test")
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 FPS = 20
-CONFIDENCE_THRESHOLD = 0.5
-RECORD_SECONDS_AFTER_LAST_DETECTION = 5
+CONFIDENCE_THRESHOLD = float(os.getenv("WEAPON_CONFIDENCE_THRESHOLD", "0.65"))
+DETECTION_HITS_TO_START = int(os.getenv("WEAPON_DETECTION_HITS_TO_START", "2"))
+SNAPSHOT_CONFIDENCE_DELTA = float(os.getenv("WEAPON_SNAPSHOT_CONFIDENCE_DELTA", "0.02"))
+RECORD_SECONDS_AFTER_LAST_DETECTION = float(os.getenv("WEAPON_RECORD_SECONDS_AFTER_LAST_DETECTION", "2"))
 
 # ---------------------------------------------------------------------------
 # Setup
@@ -61,6 +63,12 @@ print(f"Loading weapon model: {MODEL_PATH}")
 
 model = YOLO(str(MODEL_PATH))
 model.fuse()
+FIREARM_CLASS_IDS = [
+    class_id
+    for class_id, name in model.names.items()
+    if "firearm" in str(name).lower()
+]
+print(f"Firearm class ids: {FIREARM_CLASS_IDS}", flush=True)
 
 # ---------------------------------------------------------------------------
 # Threaded Camera Reader (Stops buffer accumulation)
@@ -112,12 +120,14 @@ class CameraStream:
 camera = CameraStream(0).start()
 
 tracking_enabled = False
+consecutive_firearm_hits = 0
 recording = {
     "writer": None,
     "clip_path": None,
     "snapshot_path": None,
     "last_detection_at": 0.0,
     "best_confidence": 0.0,
+    "best_label": None,
 }
 
 # ---------------------------------------------------------------------------
@@ -164,7 +174,21 @@ def build_incident_name() -> str:
     return datetime.now().strftime("weapon_%Y%m%d_%H%M%S")
 
 
-def start_recording(frame, confidence: float) -> None:
+def save_best_snapshot(frame, confidence: float, label: str) -> None:
+    snapshot_path = recording["snapshot_path"]
+    if snapshot_path is None:
+        return
+
+    previous_best = float(recording["best_confidence"])
+    if confidence < previous_best + SNAPSHOT_CONFIDENCE_DELTA:
+        return
+
+    cv2.imwrite(str(snapshot_path), frame)
+    recording["best_confidence"] = confidence
+    recording["best_label"] = label
+
+
+def start_recording(frame, confidence: float, label: str) -> None:
     incident_name = build_incident_name()
     clip_path = VIDEO_OUTPUT_DIR / f"{incident_name}.mp4"
     snapshot_path = SNAPSHOT_OUTPUT_DIR / f"{incident_name}.jpg"
@@ -172,17 +196,17 @@ def start_recording(frame, confidence: float) -> None:
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     writer = cv2.VideoWriter(str(clip_path), fourcc, FPS, (FRAME_WIDTH, FRAME_HEIGHT))
 
-    cv2.imwrite(str(snapshot_path), frame)
-
     recording.update(
         {
             "writer": writer,
             "clip_path": clip_path,
             "snapshot_path": snapshot_path,
             "last_detection_at": time.time(),
-            "best_confidence": confidence,
+            "best_confidence": 0.0,
+            "best_label": None,
         }
     )
+    save_best_snapshot(frame, confidence, label)
 
 
 def write_recording_frame(frame) -> None:
@@ -231,6 +255,7 @@ def stop_recording_and_report() -> None:
             "snapshot_path": None,
             "last_detection_at": 0.0,
             "best_confidence": 0.0,
+            "best_label": None,
         }
     )
 
@@ -245,6 +270,7 @@ def detect_weapon(frame):
         persist=True,
         tracker="bytetrack.yaml",
         conf=CONFIDENCE_THRESHOLD,
+        classes=FIREARM_CLASS_IDS or None,
         device=device,
         verbose=False,
     )
@@ -253,15 +279,24 @@ def detect_weapon(frame):
     annotated_frame = result.plot()
 
     best_confidence = 0.0
-    if result.boxes is not None and result.boxes.conf is not None and len(result.boxes.conf) > 0:
-        best_confidence = float(result.boxes.conf.max().item())
+    best_label = None
+    if (
+        result.boxes is not None
+        and result.boxes.conf is not None
+        and result.boxes.cls is not None
+        and len(result.boxes.conf) > 0
+    ):
+        best_index = int(result.boxes.conf.argmax().item())
+        best_confidence = float(result.boxes.conf[best_index].item())
+        best_class_id = int(result.boxes.cls[best_index].item())
+        best_label = model.names.get(best_class_id, str(best_class_id))
 
     weapon_detected = best_confidence >= CONFIDENCE_THRESHOLD
-    return annotated_frame, weapon_detected, best_confidence
+    return annotated_frame, weapon_detected, best_confidence, best_label
 
 
 def generate_frames():
-    global tracking_enabled
+    global tracking_enabled, consecutive_firearm_hits
 
     while True:
         success, frame = camera.read()
@@ -273,14 +308,18 @@ def generate_frames():
         display_frame = frame.copy()
 
         if tracking_enabled:
-            display_frame, weapon_detected, confidence = detect_weapon(frame)
+            display_frame, weapon_detected, confidence, label = detect_weapon(frame)
 
             if weapon_detected:
-                if recording["writer"] is None:
-                    start_recording(display_frame, confidence)
+                consecutive_firearm_hits += 1
+
+                if recording["writer"] is None and consecutive_firearm_hits >= DETECTION_HITS_TO_START:
+                    start_recording(display_frame, confidence, label or "firearms")
 
                 recording["last_detection_at"] = time.time()
-                recording["best_confidence"] = max(recording["best_confidence"], confidence)
+                save_best_snapshot(display_frame, confidence, label or "firearms")
+            else:
+                consecutive_firearm_hits = 0
 
             if recording["writer"] is not None:
                 write_recording_frame(display_frame)
@@ -320,8 +359,9 @@ def start_tracking():
 
 @app.post("/stop")
 def stop_tracking():
-    global tracking_enabled
+    global tracking_enabled, consecutive_firearm_hits
     tracking_enabled = False
+    consecutive_firearm_hits = 0
     stop_recording_and_report()
     return jsonify({"tracking": tracking_enabled})
 
@@ -334,6 +374,12 @@ def status():
             "district": DISTRICT,
             "tracking": tracking_enabled,
             "recording": recording["writer"] is not None,
+            "confidence_threshold": CONFIDENCE_THRESHOLD,
+            "detection_hits_to_start": DETECTION_HITS_TO_START,
+            "record_seconds_after_last_detection": RECORD_SECONDS_AFTER_LAST_DETECTION,
+            "firearm_class_ids": FIREARM_CLASS_IDS,
+            "best_confidence": recording["best_confidence"],
+            "best_label": recording["best_label"],
             "stream_url": "http://127.0.0.1:5000/stream",
         }
     )

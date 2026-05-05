@@ -1,15 +1,12 @@
 import './bootstrap';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import Dashboard from './components/Dashboard.jsx';
+import StreamConsole from './components/StreamConsole.jsx';
 
-const dashboardRoot = document.getElementById('dashboard-root');
+const streamRoot = document.getElementById('stream-root');
 
-if (dashboardRoot) {
-    createRoot(dashboardRoot).render(React.createElement(Dashboard, {
-        initialCameras: JSON.parse(dashboardRoot.dataset.cameras || '[]'),
-        initialIncidents: JSON.parse(dashboardRoot.dataset.incidents || '[]'),
-        initialStats: JSON.parse(dashboardRoot.dataset.stats || '{}'),
-        latestUrl: JSON.parse(dashboardRoot.dataset.latestUrl || '""'),
+if (streamRoot) {
+    createRoot(streamRoot).render(React.createElement(StreamConsole, {
+        initialCameras: JSON.parse(streamRoot.dataset.cameras || '[]'),
     }));
 }

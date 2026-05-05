@@ -27,9 +27,31 @@
                 </a>
 
                 <nav class="nav-list">
-                    <a @class(['active' => request()->routeIs('dashboard')]) href="{{ route('dashboard') }}">Dashboard</a>
+                    <a @class(['active' => request()->routeIs('dashboard')]) href="{{ route('dashboard') }}">
+                        <span>Overview</span>
+                    </a>
+                    <a @class(['active' => request()->routeIs('stream')]) href="{{ route('stream') }}">
+                        <span>Live Stream</span>
+                    </a>
+                    <a @class(['active' => request()->routeIs('incidents.*')]) href="{{ route('incidents.index') }}">
+                        <span>Incidents</span>
+                    </a>
+                    <a @class(['active' => request()->routeIs('cameras.*')]) href="{{ route('cameras.index') }}">
+                        <span>Cameras</span>
+                    </a>
+                    <a @class(['active' => request()->routeIs('evidence.*')]) href="{{ route('evidence.index') }}">
+                        <span>Evidence</span>
+                    </a>
+                    <a @class(['active' => request()->routeIs('dashboard')]) href="{{ route('dashboard') }}#reports">
+                        <span>Reports</span>
+                    </a>
+                    <a href="{{ url('/up') }}" target="_blank" rel="noreferrer">
+                        <span>System Health</span>
+                    </a>
                     @if(auth()->user()->isAdmin())
-                        <a @class(['active' => request()->routeIs('admin.*')]) href="{{ route('admin.users.index') }}">Users</a>
+                        <a @class(['active' => request()->routeIs('admin.*')]) href="{{ route('admin.users.index') }}">
+                            <span>Users</span>
+                        </a>
                     @endif
                 </nav>
 
