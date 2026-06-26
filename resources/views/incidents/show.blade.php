@@ -40,9 +40,9 @@
                     <p>Best captured still frame.</p>
                 </div>
             </div>
-            @if($incident->snapshot_url)
-                <a href="{{ $incident->snapshot_url }}" target="_blank" rel="noreferrer">
-                    <img class="evidence-image" src="{{ $incident->snapshot_url }}" alt="Incident snapshot">
+            @if($incident->snapshot_src)
+                <a href="{{ $incident->snapshot_src }}" target="_blank" rel="noreferrer">
+                    <img class="evidence-image" src="{{ $incident->snapshot_src }}" alt="Incident snapshot">
                 </a>
             @else
                 <p class="empty-state">No snapshot was saved for this incident.</p>
@@ -56,14 +56,14 @@
                 <h2>Video Clip</h2>
                 <p>Recorded evidence from the detection window.</p>
             </div>
-            @if($incident->clip_path)
-                <a class="ghost-button" href="{{ $incident->clip_path }}" target="_blank" rel="noreferrer">Open file</a>
+            @if($incident->clip_src)
+                <a class="ghost-button" href="{{ $incident->clip_src }}" target="_blank" rel="noreferrer">Open file</a>
             @endif
         </div>
 
-        @if($incident->clip_path)
+        @if($incident->clip_src)
             <video class="evidence-video" controls preload="metadata">
-                <source src="{{ $incident->clip_path }}" type="video/mp4">
+                <source src="{{ $incident->clip_src }}" type="video/mp4">
             </video>
         @else
             <p class="empty-state">No clip was saved for this incident.</p>

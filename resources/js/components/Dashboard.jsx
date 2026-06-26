@@ -367,6 +367,8 @@ function StatCard({ label, value, tone = '' }) {
 function IncidentRow({ incident }) {
     const cameraId = incident.external_camera_id || incident.camera?.camera_id || 'Unknown';
     const district = incident.district || incident.camera?.district || 'No district';
+    const snapshotSrc = incident.snapshot_src || incident.snapshot_url;
+    const clipSrc = incident.clip_src || incident.clip_path;
     const confidence = incident.confidence === null || incident.confidence === undefined
         ? 'N/A'
         : `${(Number(incident.confidence) * 100).toFixed(1)}%`;
@@ -386,9 +388,9 @@ function IncidentRow({ incident }) {
             <td>{confidence}</td>
             <td>{detectedAt ? new Date(detectedAt).toLocaleString() : 'N/A'}</td>
             <td className="evidence-links">
-                {incident.snapshot_url && <a href={incident.snapshot_url} target="_blank" rel="noreferrer">Snapshot</a>}
-                {incident.clip_path && <a href={incident.clip_path} target="_blank" rel="noreferrer">Clip</a>}
-                {!incident.snapshot_url && !incident.clip_path && <span>N/A</span>}
+                {snapshotSrc && <a href={snapshotSrc} target="_blank" rel="noreferrer">Snapshot</a>}
+                {clipSrc && <a href={clipSrc} target="_blank" rel="noreferrer">Clip</a>}
+                {!snapshotSrc && !clipSrc && <span>N/A</span>}
             </td>
         </tr>
     );

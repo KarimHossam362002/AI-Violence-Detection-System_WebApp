@@ -386,3 +386,8 @@ storage/app/
   models/
   public/incidents/
 ```
+### To run the app
+```
+composer run dev
+
+```

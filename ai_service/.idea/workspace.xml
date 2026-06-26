@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
   <component name="ChangeListManager">
     <list default="true" id="dd486307-3299-4715-8b91-2f05ee5d6e62" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../README.md" beforeDir="false" afterPath="$PROJECT_DIR$/../README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../app/Models/Incident.php" beforeDir="false" afterPath="$PROJECT_DIR$/../app/Models/Incident.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/../package-lock.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../resources/js/components/Dashboard.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../resources/js/components/Dashboard.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../resources/views/dashboard/partials/incident-row.blade.php" beforeDir="false" afterPath="$PROJECT_DIR$/../resources/views/dashboard/partials/incident-row.blade.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../resources/views/evidence/index.blade.php" beforeDir="false" afterPath="$PROJECT_DIR$/../resources/views/evidence/index.blade.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../resources/views/incidents/show.blade.php" beforeDir="false" afterPath="$PROJECT_DIR$/../resources/views/incidents/show.blade.php" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -13,9 +21,9 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 6
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 6
+}</component>
   <component name="ProjectId" id="3DBluni4xg1W9BFf1UWj2NBxNk7" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -24,6 +32,7 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Python.weapon_detection_service.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "git-widget-placeholder": "main",

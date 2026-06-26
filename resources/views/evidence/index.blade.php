@@ -18,8 +18,8 @@
         @forelse($incidents as $incident)
             <article class="panel evidence-card">
                 <div class="evidence-thumb">
-                    @if($incident->snapshot_url)
-                        <img src="{{ $incident->snapshot_url }}" alt="Incident snapshot">
+                    @if($incident->snapshot_src)
+                        <img src="{{ $incident->snapshot_src }}" alt="Incident snapshot">
                     @else
                         <span>No snapshot</span>
                     @endif
@@ -31,8 +31,8 @@
                 </div>
                 <div class="evidence-links">
                     <a class="ghost-button compact-button" href="{{ route('incidents.show', $incident) }}">Inspect</a>
-                    @if($incident->clip_path)
-                        <a class="ghost-button compact-button" href="{{ $incident->clip_path }}" target="_blank" rel="noreferrer">Clip</a>
+                    @if($incident->clip_src)
+                        <a class="ghost-button compact-button" href="{{ $incident->clip_src }}" target="_blank" rel="noreferrer">Clip</a>
                     @endif
                 </div>
             </article>
